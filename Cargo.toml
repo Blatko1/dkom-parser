@@ -1,0 +1,10 @@
+[package]
+name = "dkom_parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+scraper = "0.19.1"
+anyhow = "1.0.86"
+reqwest = { version = "0.12.5", features = ["blocking"] }
+lopdf = "0.33.0"
