@@ -71,11 +71,12 @@ fn main() -> anyhow::Result<()> {
             }
         };
         let name = &format!("{} {}.pdf", date, class);
+        let path = std::env::current_exe().unwrap().parent().unwrap().join(name);
         std::fs::write(
-            name,
+            path,
             &pdf_bytes,
         )?;
-        println!("Dokument spremljen pod nazivom '{}'.\n", name);
+        println!("Dokument spremljen pod nazivom '{}' na putanji: {:?}.\n", name, path);
     }
 
     Ok(())
