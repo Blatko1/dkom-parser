@@ -56,7 +56,7 @@ fn main() -> anyhow::Result<()> {
 
         let date = match get_date_from_pdf(&pdf_bytes) {
             Ok((year, month, day)) => match NaiveDate::from_ymd_opt(year, month, day) {
-                Some(date) => {println!("Datum odluke: {}.{}.{}", day, month, year); date.format("%Y.%m.%d").to_string()},
+                Some(date) => {println!("Datum odluke: {}.{}.{}", day, month, year); date.format("%Y.%m.%d.").to_string()},
                 None => {
                     println!(
                         "Neispravan datum (dan.mjesec.godina): {}.{}.{}",
@@ -70,11 +70,12 @@ fn main() -> anyhow::Result<()> {
                 String::from("_xx.xx.xx_")
             }
         };
+        let name = &format!("{} {}.pdf", date, class);
         std::fs::write(
-            &format!("{} {}.pdf", date, class),
+            name,
             &pdf_bytes,
         )?;
-        println!("Dokument spremljen.\n");
+        println!("Dokument spremljen pod nazivom '{}'.\n", name);
     }
 
     Ok(())
