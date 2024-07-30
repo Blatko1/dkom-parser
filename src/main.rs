@@ -54,27 +54,24 @@ fn main() -> anyhow::Result<()> {
         let pdf_bytes = pdf_res.bytes()?.to_vec();
         println!("Dokument preuzet!\n Čitam datum odluke...");
 
-        let (year, month, day) = match get_date_from_pdf(&pdf_bytes) {
-            Ok(ymd) => ymd,
+        let date = match get_date_from_pdf(&pdf_bytes) {
+            Ok((year, month, day)) => match NaiveDate::from_ymd_opt(year, month, day) {
+                Some(date) => {println!("Datum odluke: {}.{}.{}", day, month, year); date.format("%Y.%m.%d").to_string()},
+                None => {
+                    println!(
+                        "Neispravan datum (dan.mjesec.godina): {}.{}.{}",
+                        day, month, year
+                    );
+                    String::from("_xx.xx.xx_")
+                }
+            },
             Err(err) => {
                 eprintln!("{}", err);
-                continue;
+                String::from("_xx.xx.xx_")
             }
         };
-
-        let date = match NaiveDate::from_ymd_opt(year, month, day) {
-            Some(date) => date,
-            None => {
-                println!(
-                    "Neispravan datum (dan.mjesec.godina): {}.{}.{}",
-                    day, month, year
-                );
-                continue;
-            }
-        };
-        println!("Datum odluke: {}.{}.{}", day, month, year);
         std::fs::write(
-            &format!("{} {}.pdf", date.format("%Y.%m.%d"), class),
+            &format!("{} {}.pdf", date, class),
             &pdf_bytes,
         )?;
         println!("Dokument spremljen.\n");
