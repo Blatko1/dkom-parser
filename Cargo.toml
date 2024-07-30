@@ -8,3 +8,4 @@ scraper = "0.19.1"
 anyhow = "1.0.86"
 reqwest = { version = "0.12.5", features = ["blocking"] }
 lopdf = "0.33.0"
+chrono = "0.4.38"
