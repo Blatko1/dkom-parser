@@ -91,7 +91,6 @@ fn get_date_from_pdf(pdf_bytes: &[u8]) -> anyhow::Result<(i32, u32, u32)> {
             \n Dokument je vjerovatno slika!!!!!!!!!!!!!!!!!",
     )?;
     let mut dot_counter = 0;
-    println!("page: {}", first_page);
     let raw_date: String = first_page[idx..]
         .chars()
         .skip_while(|&c| c != ',')
