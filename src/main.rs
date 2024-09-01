@@ -1,5 +1,6 @@
 use anyhow::Context;
 use chrono::NaiveDate;
+use lopdf::Document;
 use core::panic;
 use scraper::Selector;
 
@@ -83,13 +84,14 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn get_date_from_pdf(pdf_bytes: &[u8]) -> anyhow::Result<(i32, u32, u32)> {
-    let doc = lopdf::Document::load_mem(pdf_bytes).unwrap();
+    let doc = Document::load_mem(pdf_bytes).unwrap();
     let first_page = doc.extract_text(&[1])?;
     let idx = first_page.find("Zagreb,").context(
         "!!!!!!!!!!!!!!!!!U dokumentu nema 'Zagreb,'!!!!!!!!!!!!!!!!!\
             \n Dokument je vjerovatno slika!!!!!!!!!!!!!!!!!",
     )?;
     let mut dot_counter = 0;
+    println!("page: {}", first_page);
     let raw_date: String = first_page[idx..]
         .chars()
         .skip_while(|&c| c != ',')
@@ -113,12 +115,12 @@ fn get_date_from_pdf(pdf_bytes: &[u8]) -> anyhow::Result<(i32, u32, u32)> {
         .filter(|&c| !c.is_whitespace())
         .collect();
     let day: u32 = raw_day.trim().parse().unwrap();
-    let raw_month: String = raw_date
+    let raw_month = raw_date
         .chars()
         .skip_while(|&c| c != '.')
         .skip(1)
         .take_while(|&c| !c.is_numeric())
-        .collect();
+        .collect::<String>().replace(char::is_whitespace, "");
     let month = month_str_to_digit(raw_month.trim());
     let raw_year: String = raw_date
         .chars()
