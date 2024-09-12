@@ -121,13 +121,13 @@ fn get_date_from_pdf(pdf_bytes: &[u8]) -> anyhow::Result<(i32, u32, u32)> {
         .take_while(|&c| !c.is_numeric())
         .collect::<String>().replace(char::is_whitespace, "");
     let month = month_str_to_digit(raw_month.trim());
-    let raw_year: String = raw_date
+    let raw_year = raw_date
         .chars()
         .skip_while(|&c| c != '.')
-        .skip_while(|&c| !c.is_numeric())
-        .take(4)
-        .collect();
+        .skip_while(|&c| !c.is_numeric()).take_while(|_| {true})
+        .collect::<String>().replace(char::is_whitespace, "");
     let year: i32 = raw_year.trim().parse().unwrap();
+    println!("raw: {}", raw_date);
 
     Ok((year, month, day))
 }
