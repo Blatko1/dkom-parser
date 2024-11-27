@@ -144,7 +144,7 @@ fn month_str_to_digit(month: &str) -> u32 {
         "kolovoza" => 8,
         "rujna" => 9,
         "listopada" => 10,
-        "studenog" => 11,
+        "studenog" | "studenoga" => 11,
         "prosinca" => 12,
         _ => panic!("nepoznat mjesec! '{}'", month),
     }
