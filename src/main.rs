@@ -79,6 +79,7 @@ fn main() -> anyhow::Result<()> {
         )?;
         println!("Dokument spremljen pod nazivom '{}' na putanji: {:?}.\n", name, path);
     }
+    println!("GOTOVO!!!!!");
 
     Ok(())
 }
