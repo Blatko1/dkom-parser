@@ -20,7 +20,7 @@ fn main() -> anyhow::Result<()> {
         .collect();
 
     for elem in content {
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        //std::thread::sleep(std::time::Duration::from_secs(1));
         let raw_pdf_url: String = elem
             .chars()
             .skip_while(|&c| c != '"')
