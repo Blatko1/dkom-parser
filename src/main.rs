@@ -1,7 +1,8 @@
-use anyhow::Context;
+use anyhow::Error;
 use chrono::NaiveDate;
-use lopdf::Document;
 use core::panic;
+use lopdf::Document;
+use regex::Regex;
 use scraper::Selector;
 
 fn main() -> anyhow::Result<()> {
@@ -10,54 +11,44 @@ fn main() -> anyhow::Result<()> {
     let document = scraper::Html::parse_document(&source);
 
     let content_selector = Selector::parse(
+        "div.hh-items-wrap > div:nth-child(2) > div:first-child > div.hhi-content > ul",
+    )
+    .map_err(|e| eprintln!("{e}"))
+    .unwrap();
+    let content_count = Selector::parse(
         "div.hh-items-wrap > div:nth-child(2) > div:first-child > div.hhi-content > ul > li",
     )
     .map_err(|e| eprintln!("{e}"))
     .unwrap();
-    let content: Vec<String> = document
+
+    let list: String = document
         .select(&content_selector)
-        .map(|e| e.inner_html())
-        .collect();
+        .next()
+        .unwrap()
+        .inner_html();
+    let list_len = document.select(&content_count).count();
 
-    for elem in content {
-        //std::thread::sleep(std::time::Duration::from_secs(1));
-        let raw_pdf_url: String = elem
-            .chars()
-            .skip_while(|&c| c != '"')
-            .skip(1)
-            .take_while(|&c| c != '"')
-            .collect();
-        let raw_class: String = elem
-            .chars()
-            .skip_while(|&c| c != '>')
-            .skip(1)
-            .take_while(|&c| c != '<')
-            .collect();
-        let class_unparsed = raw_class
-            .chars()
-            .skip_while(|&c| c != '/')
-            .skip(1)
-            .skip_while(|&c| c != '/')
-            .skip(1)
-            .skip_while(|&c| c != '/')
-            .skip(1)
-            .collect::<String>();
-        let class: u32 = match class_unparsed.parse() {
-            Ok(c) => c,
-            Err(_) => {
-                println!("Klasa ima neispravan format: {}!!!\n\n", class_unparsed);
-                continue;
-            }
-        };
+    let data_regex = Regex::new(r#"<a href="(.+?)">[\s\S]*?\/(\d+)<\/a>"#).unwrap();
 
-        println!("\n Preuzimam dokument s: {}...", raw_pdf_url);
-        let pdf_res = reqwest::blocking::get(raw_pdf_url)?;
+    let exe_dir = std::env::current_exe().unwrap();
+    let save_dir = exe_dir.parent().unwrap();
+    let mut succesfully_parsed_docs = 0;
+    for (_, [pdf_url, class]) in data_regex.captures_iter(&list).map(|c| c.extract()) {
+        print!("Preuzimanje PDF dokumenta s poveznice: {}...", pdf_url);
+        let pdf_res = reqwest::blocking::get(pdf_url)?;
         let pdf_bytes = pdf_res.bytes()?.to_vec();
-        println!("Dokument preuzet!\n Čitam datum odluke...");
+        print!(
+            " Dokument preuzet!\nČitanje informacija... [klasa: {}]",
+            class
+        );
 
         let date = match get_date_from_pdf(&pdf_bytes) {
-            Ok((year, month, day)) => match NaiveDate::from_ymd_opt(year, month, day) {
-                Some(date) => {println!("Datum odluke: {}.{}.{}", day, month, year); date.format("%Y.%m.%d.").to_string()},
+            Ok((year, month, day)) => match NaiveDate::from_ymd_opt(year as i32, month, day) {
+                Some(date) => {
+                    println!(" [datum: {}.{}.{}]", day, month, year);
+                    succesfully_parsed_docs += 1;
+                    date.format("%Y.%m.%d.").to_string()
+                }
                 None => {
                     println!(
                         "Neispravan datum (dan.mjesec.godina): {}.{}.{}",
@@ -67,73 +58,40 @@ fn main() -> anyhow::Result<()> {
                 }
             },
             Err(err) => {
-                eprintln!("{}", err);
+                eprintln!("\nError čitanja PDF-a: {}", err);
                 String::from("_xx.xx.xx_")
             }
         };
         let name = &format!("{} {}.pdf", date, class);
-        let path = std::env::current_exe().unwrap().parent().unwrap().join(name);
-        std::fs::write(
-            &path,
-            &pdf_bytes,
-        )?;
-        println!("Dokument spremljen pod nazivom '{}' na putanji: {:?}.\n", name, path);
+        std::fs::write(save_dir.join(name), &pdf_bytes)?;
+        println!("Dokument spremljen pod nazivom '{}'.\n", name);
     }
-    println!("GOTOVO!!!!!");
+
+    print!("Preuzimanje završeno! Uspješno procesuirano {} od {} PDF dokumenata.\nSvi preuzeti dokumenti su spremljeni na lokaciji: {:?}", succesfully_parsed_docs, list_len, save_dir);
 
     Ok(())
 }
 
-fn get_date_from_pdf(pdf_bytes: &[u8]) -> anyhow::Result<(i32, u32, u32)> {
+fn get_date_from_pdf(pdf_bytes: &[u8]) -> anyhow::Result<(u32, u32, u32)> {
     let doc = Document::load_mem(pdf_bytes).unwrap();
     let first_page = doc.extract_text(&[1])?;
-    let idx = first_page.find("Zagreb,").context(
-        "!!!!!!!!!!!!!!!!!U dokumentu nema 'Zagreb,'!!!!!!!!!!!!!!!!!\
-            \n Dokument je vjerovatno slika!!!!!!!!!!!!!!!!!",
-    )?;
-    let mut dot_counter = 0;
-    let raw_date: String = first_page[idx..]
-        .chars()
-        .skip_while(|&c| c != ',')
-        .skip(1)
-        .take_while(|&c| {
-            if c == '.' {
-                if dot_counter == 1 {
-                    false
-                } else {
-                    dot_counter += 1;
-                    true
-                }
-            } else {
-                true
-            }
-        })
-        .collect();
-    let raw_day: String = raw_date
-        .chars()
-        .take_while(|&c| c != '.')
-        .filter(|&c| !c.is_whitespace())
-        .collect();
-    let day: u32 = raw_day.trim().parse().unwrap();
-    let raw_month = raw_date
-        .chars()
-        .skip_while(|&c| c != '.')
-        .skip(1)
-        .take_while(|&c| !c.is_numeric())
-        .collect::<String>().replace(char::is_whitespace, "");
-    let month = month_str_to_digit(raw_month.trim());
-    let raw_year = raw_date
-        .chars()
-        .skip_while(|&c| c != '.')
-        .skip_while(|&c| !c.is_numeric()).take_while(|_| {true})
-        .collect::<String>().replace(char::is_whitespace, "");
-    let year: i32 = raw_year.trim().parse().unwrap();
-    println!("raw: {}", raw_date);
+    let date_regex =
+        Regex::new(r"KLASA:[\s\S]*?URBROJ:[\s\S]*?,([\s\S]+?)\.([^\d]+)([^.]+)").unwrap();
+    let Some((_, [day, month, year])) = date_regex
+        .captures_iter(&first_page)
+        .map(|c| c.extract())
+        .next()
+    else {
+        return Err(Error::msg("Neuspjelo čitanje datuma iz PDF dokumenta!"));
+    };
+    let parsed_day: u32 = day.replace(char::is_whitespace, "").parse()?;
+    let parsed_year: u32 = year.replace(char::is_whitespace, "").parse()?;
+    let parsed_month = month_to_digit(&month.replace(char::is_whitespace, ""));
 
-    Ok((year, month, day))
+    Ok((parsed_year, parsed_month, parsed_day))
 }
 
-fn month_str_to_digit(month: &str) -> u32 {
+fn month_to_digit(month: &str) -> u32 {
     match month {
         "siječnja" => 1,
         "veljače" => 2,
