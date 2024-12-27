@@ -1,7 +1,6 @@
 use anyhow::Error;
 use chrono::NaiveDate;
 use core::panic;
-use lopdf::Document;
 use regex::Regex;
 use scraper::Selector;
 
@@ -51,7 +50,7 @@ fn main() -> anyhow::Result<()> {
                 }
                 None => {
                     println!(
-                        "Neispravan datum (dan.mjesec.godina): {}.{}.{}",
+                        "Neispravan datum (dan.mjesec.godina): {}.{}.{}\n",
                         day, month, year
                     );
                     String::from("_xx.xx.xx_")
@@ -73,20 +72,19 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn get_date_from_pdf(pdf_bytes: &[u8]) -> anyhow::Result<(u32, u32, u32)> {
-    let doc = Document::load_mem(pdf_bytes).unwrap();
-    let first_page = doc.extract_text(&[1])?;
+    let pdf_content = pdf_extract::extract_text_from_mem(pdf_bytes)?;
     let date_regex =
-        Regex::new(r"KLASA:[\s\S]*?URBROJ:[\s\S]*?,([\s\S]+?)\.([^\d]+)([^.]+)").unwrap();
+        Regex::new(r"A:[\s\S]*?J:[\s\S]*?, (\d+)\. ([^\d]+) (\d+).").unwrap();
     let Some((_, [day, month, year])) = date_regex
-        .captures_iter(&first_page)
+        .captures_iter(&pdf_content)
         .map(|c| c.extract())
         .next()
     else {
         return Err(Error::msg("Neuspjelo čitanje datuma iz PDF dokumenta!"));
     };
-    let parsed_day: u32 = day.replace(char::is_whitespace, "").parse()?;
-    let parsed_year: u32 = year.replace(char::is_whitespace, "").parse()?;
-    let parsed_month = month_to_digit(&month.replace(char::is_whitespace, ""));
+    let parsed_day: u32 = day.parse()?;
+    let parsed_year: u32 = year.parse()?;
+    let parsed_month = month_to_digit(month);
 
     Ok((parsed_year, parsed_month, parsed_day))
 }
